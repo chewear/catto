@@ -9,9 +9,21 @@
 <body>
     <div class="main-container">
         <h1>Catto</h1>
-        <p>Use WASD or Arrow Keys to move the cat</p>
+        <p>by chewear</p>
+        <!-- Score Display Row -->
+        <div id="scoreDisplay">
+            <div class="score-item">
+                <span>🏆 High Score: <span id="displayHighScore">0</span></span>
+            </div>
+            <div class="score-item">
+                <span>💀 Current Score: <span id="currentScore">0</span></span>
+            </div>
+        </div>
         <div class="game-container">
         <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        
+        <!-- High Score Display -->
+        
         
         <div id="ui">
             <div class="bar-container">
@@ -48,6 +60,21 @@
                 <div class="stat-item">
                     <span>👹 <span id="enemyCount">0</span>/<span id="enemyCap">15</span></span>
                 </div>
+            </div>
+        </div>
+
+        <!-- Start Game Overlay -->
+        <div id="startOverlay">
+            <div class="start-content">
+                <h2>🐱 Welcome to Catto!</h2>
+                <p>Survive waves of enemies using your cat abilities</p>
+                <div class="controls-info">
+                    <p><strong>Controls:</strong></p>
+                    <p>• WASD or Arrow Keys to move</p>
+                    <p>• Gain XP by defeating enemies</p>
+                    <p>• Level up to unlock new abilities</p>
+                </div>
+                <button class="start-btn" onclick="startGameFromOverlay()">Start Game</button>
             </div>
         </div>
 

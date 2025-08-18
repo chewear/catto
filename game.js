@@ -21,8 +21,12 @@ function onSpriteLoad() {
         // Update player dimensions to match sprite
         gameState.player.width = 38;  // Player sprite width
         gameState.player.height = 38; // Player sprite height
-        // Start the game once all images are loaded
-        startGame();
+        // Initialize instead of auto-starting
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeGame);
+        } else {
+            initializeGame();
+        }
     }
 }
 
@@ -56,6 +60,33 @@ sprites.rat.src = 'assets/rat.png';
 sprites.paw.onload = onSpriteLoad;
 sprites.paw.onerror = () => onSpriteError('paw');
 sprites.paw.src = 'assets/paw.png';
+
+// Function to get high score from localStorage
+function getHighScore() {
+    return parseInt(localStorage.getItem('catto_highscore') || '0');
+}
+
+// Function to update high score display
+function updateHighScoreDisplay() {
+    const highScore = getHighScore();
+    document.getElementById('displayHighScore').textContent = highScore;
+    document.getElementById('previewHighScore').textContent = highScore;
+    // Update current score
+    document.getElementById('currentScore').textContent = gameState.kills;
+}
+
+// Function to start game from overlay
+function startGameFromOverlay() {
+    document.getElementById('startOverlay').style.display = 'none';
+    startGame();
+}
+
+// Initialize high score display on page load
+function initializeGame() {
+    updateHighScoreDisplay();
+    // Show start overlay
+    document.getElementById('startOverlay').style.display = 'flex';
+}
 
 // Game state
 let gameState = {
@@ -908,12 +939,14 @@ function updateUI() {
     document.getElementById('kills').textContent = gameState.kills;
     document.getElementById('enemyCount').textContent = enemies.length;
     document.getElementById('enemyCap').textContent = maxEnemies;
+
+    document.getElementById('currentScore').textContent = gameState.kills;
 }
 
 function gameOver() {
     gameState.gameOver = true;
     const finalScore = gameState.kills;
-    const currentHighScore = localStorage.getItem('catto_highscore') || 0;
+    const currentHighScore = getHighScore(); // CHANGED LINE
     
     if (finalScore > currentHighScore) {
         localStorage.setItem('catto_highscore', finalScore);
@@ -923,6 +956,10 @@ function gameOver() {
     document.getElementById('highScore').textContent = Math.max(currentHighScore, finalScore);
     document.getElementById('finalTime').textContent = Math.floor(gameState.time / 60);
     document.getElementById('gameOver').style.display = 'block';
+    
+    // ADD THESE TWO LINES
+    // Update high score display
+    updateHighScoreDisplay();
 }
 
 function startGame() {
@@ -965,6 +1002,7 @@ function startGame() {
     // Hide modals
     document.getElementById('gameOver').style.display = 'none';
     document.getElementById('levelUpModal').style.display = 'none';
+    document.getElementById('startOverlay').style.display = 'none';
 
     gameLoop();
 }
@@ -988,4 +1026,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Game will start automatically after sprite loads
+// Initialize game on page load instead of auto-starting
+document.addEventListener('DOMContentLoaded', () => {
+    initializeGame();
+});
