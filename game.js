@@ -1,17 +1,76 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Load all sprites
+const sprites = {
+    player: new Image(),
+    dog: new Image(),
+    crow: new Image(),
+    rat: new Image(),
+    paw: new Image()
+};
+
+let spritesLoaded = 0;
+const totalSprites = Object.keys(sprites).length;
+
+function onSpriteLoad() {
+    spritesLoaded++;
+    console.log(`Sprite loaded: ${spritesLoaded}/${totalSprites}`);
+    if (spritesLoaded === totalSprites) {
+        console.log('All sprites loaded successfully');
+        // Update player dimensions to match sprite
+        gameState.player.width = 38;  // Player sprite width
+        gameState.player.height = 38; // Player sprite height
+        // Start the game once all images are loaded
+        startGame();
+    }
+}
+
+function onSpriteError(spriteName) {
+    console.error(`Error loading ${spriteName} sprite`);
+    spritesLoaded++;
+    if (spritesLoaded === totalSprites) {
+        // Start the game even if some sprites fail to load
+        startGame();
+    }
+}
+
+// Load player sprite
+sprites.player.onload = onSpriteLoad;
+sprites.player.onerror = () => onSpriteError('player');
+sprites.player.src = 'assets/neko.png';
+
+// Load enemy sprites
+sprites.dog.onload = onSpriteLoad;
+sprites.dog.onerror = () => onSpriteError('dog');
+sprites.dog.src = 'assets/dog.png';
+
+sprites.crow.onload = onSpriteLoad;
+sprites.crow.onerror = () => onSpriteError('crow');
+sprites.crow.src = 'assets/crow.png';
+
+sprites.rat.onload = onSpriteLoad;
+sprites.rat.onerror = () => onSpriteError('rat');
+sprites.rat.src = 'assets/rat.png';
+
+sprites.paw.onload = onSpriteLoad;
+sprites.paw.onerror = () => onSpriteError('paw');
+sprites.paw.src = 'assets/paw.png';
+
 // Game state
 let gameState = {
     player: {
-        x: 400,
-        y: 300,
+        x: 600,
+        y: 400,
         hp: 100,
         maxHp: 100, // Fixed at 100
         level: 1,
         xp: 0,
         xpNext: 10,
-        speed: 3
+        speed: 3,
+        width: 38,  // Player sprite size
+        height: 38,  // Player sprite size
+        facingLeft: false // Track which direction the player is facing
     },
     time: 0,
     kills: 0,
@@ -110,8 +169,8 @@ let particles = [];
 
 // Enemy types with reduced base stats
 const enemyTypes = {
-    mouse: {
-        name: "Street Mouse",
+    rat: {
+        name: "Street Rat",
         hp: 12,        // Further reduced for easier early game
         speed: 0.7,    // Slightly slower for better control
         damage: 2,     // Reduced for less punishing early game
@@ -151,7 +210,7 @@ function initClawOrbit() {
     for (let i = 0; i < clawCount; i++) {
         abilities.clawOrbit.claws.push({
             angle: (Math.PI * 2 / clawCount) * i,
-            distance: 40
+            distance: 55
         });
     }
 }
@@ -160,12 +219,18 @@ function initClawOrbit() {
 function updatePlayer() {
     if (keys['w'] || keys['arrowup']) gameState.player.y -= gameState.player.speed;
     if (keys['s'] || keys['arrowdown']) gameState.player.y += gameState.player.speed;
-    if (keys['a'] || keys['arrowleft']) gameState.player.x -= gameState.player.speed;
-    if (keys['d'] || keys['arrowright']) gameState.player.x += gameState.player.speed;
+    if (keys['a'] || keys['arrowleft']) {
+        gameState.player.x -= gameState.player.speed;
+        gameState.player.facingLeft = true; // Face left when moving left
+    }
+    if (keys['d'] || keys['arrowright']) {
+        gameState.player.x += gameState.player.speed;
+        gameState.player.facingLeft = false; // Face right when moving right
+    }
 
     // Keep player in bounds
-    gameState.player.x = Math.max(20, Math.min(canvas.width - 20, gameState.player.x));
-    gameState.player.y = Math.max(20, Math.min(canvas.height - 20, gameState.player.y));
+    gameState.player.x = Math.max(30, Math.min(canvas.width - 30, gameState.player.x));
+    gameState.player.y = Math.max(30, Math.min(canvas.height - 30, gameState.player.y));
 }
 
 // Update abilities
@@ -325,7 +390,7 @@ function spawnEnemies() {
     
     if (Math.random() < finalSpawnRate) {
         // Enemy type selection based on wave and level
-        let selectedType = 'mouse';
+        let selectedType = 'rat';
         
         // Wave-based enemy progression
         const dogUnlockWave = 2; // Dogs appear from wave 2 (25 seconds)
@@ -334,17 +399,17 @@ function spawnEnemies() {
         if (waveNumber >= crowUnlockWave && gameState.player.level >= 5) {
             // Late game: varied enemy types
             const rand = Math.random();
-            if (rand < 0.4) selectedType = 'mouse';
+            if (rand < 0.4) selectedType = 'rat';
             else if (rand < 0.7) selectedType = 'dog';
             else selectedType = 'crow';
         } else if (waveNumber >= dogUnlockWave && gameState.player.level >= 2) {
-            // Mid game: mice and dogs
+            // Mid game: rats and dogs
             const rand = Math.random();
-            if (rand < 0.6) selectedType = 'mouse';
+            if (rand < 0.6) selectedType = 'rat';
             else selectedType = 'dog';
         } else {
-            // Early game: mostly mice
-            selectedType = 'mouse';
+            // Early game: mostly rats
+            selectedType = 'rat';
         }
 
         const enemyTemplate = enemyTypes[selectedType];
@@ -376,7 +441,8 @@ function spawnEnemies() {
             size: enemyTemplate.size,
             xpValue: Math.floor(enemyTemplate.xpValue * Math.max(totalScaling, 1.2)),
             type: selectedType,
-            wave: waveNumber
+            wave: waveNumber,
+            facingLeft: false // Track enemy facing direction
         });
     }
 }
@@ -392,10 +458,15 @@ function updateEnemies() {
         if (dist > 0) {
             enemy.x += (dx / dist) * enemy.speed;
             enemy.y += (dy / dist) * enemy.speed;
+            
+            // Update facing direction for crow (faces the direction it's moving)
+            if (enemy.type === 'crow') {
+                enemy.facingLeft = dx < 0;
+            }
         }
 
         // Check collision with player
-        if (dist < enemy.size + 15) {
+        if (dist < enemy.size + 20) {
             if (!gameState.player.invulnerable || gameState.player.invulnerable <= 0) {
                 // Reduce damage taken and add brief invulnerability after hit
                 const damageReduction = abilities.catNap.level >= 2 ? 0.95 : 1;
@@ -418,7 +489,7 @@ function updateEnemies() {
         if (abilities.clawOrbit.level > 0) {
             abilities.clawOrbit.claws.forEach(claw => {
                 const clawDist = Math.hypot(claw.x - enemy.x, claw.y - enemy.y);
-                const clawSize = abilities.clawOrbit.level >= 4 ? 12 : 8;
+                const clawSize = abilities.clawOrbit.level >= 4 ? 20 : 16;
                 if (clawDist < clawSize + enemy.size) {
                     let damage = abilities.clawOrbit.damage;
                     // Progressive damage scaling
@@ -606,62 +677,181 @@ function updateParticles() {
 
 // Rendering functions
 function render() {
-    ctx.fillStyle = 'rgba(26, 26, 46, 0.1)';
+    // Clear the canvas with a solid background color
+    ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw player (cat)
-    ctx.fillStyle = gameState.player.invulnerable > 0 ? 'rgba(255, 165, 0, 0.5)' : '#FFA500';
-    ctx.beginPath();
-    ctx.arc(gameState.player.x, gameState.player.y, 15, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Draw cat ears
-    ctx.fillStyle = '#FF8C00';
-    ctx.beginPath();
-    ctx.moveTo(gameState.player.x - 8, gameState.player.y - 10);
-    ctx.lineTo(gameState.player.x - 15, gameState.player.y - 20);
-    ctx.lineTo(gameState.player.x - 5, gameState.player.y - 15);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(gameState.player.x + 8, gameState.player.y - 10);
-    ctx.lineTo(gameState.player.x + 15, gameState.player.y - 20);
-    ctx.lineTo(gameState.player.x + 5, gameState.player.y - 15);
-    ctx.fill();
+    ctx.save();
+    if (gameState.player.invulnerable > 0) {
+        ctx.globalAlpha = 0.5; // Make transparent when invulnerable
+    }
+    
+    // Draw the sprite centered on the player's position
+    if (sprites.player.complete && sprites.player.naturalWidth > 0) {
+        // If image is loaded successfully, draw it
+        try {
+            const playerX = Math.round(gameState.player.x - gameState.player.width / 2);
+            const playerY = Math.round(gameState.player.y - gameState.player.height / 2);
+            
+            if (gameState.player.facingLeft) {
+                // Flip horizontally for left-facing
+                ctx.save();
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    sprites.player,
+                    -playerX - gameState.player.width, // Flip X coordinate
+                    playerY,
+                    gameState.player.width,
+                    gameState.player.height
+                );
+                ctx.restore();
+            } else {
+                // Normal right-facing
+                ctx.drawImage(
+                    sprites.player,
+                    playerX,
+                    playerY,
+                    gameState.player.width,
+                    gameState.player.height
+                );
+            }
+        } catch (error) {
+            console.error('Error drawing sprite:', error);
+            // Fallback to circle if drawing fails
+            ctx.fillStyle = '#FFA500';
+            ctx.beginPath();
+            ctx.arc(gameState.player.x, gameState.player.y, 15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else {
+        // Fallback to circle if image isn't loaded
+        ctx.fillStyle = '#FFA500';
+        ctx.beginPath();
+        ctx.arc(gameState.player.x, gameState.player.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    ctx.restore();
 
     // Draw claws
     if (abilities.clawOrbit.level > 0) {
         abilities.clawOrbit.claws.forEach(claw => {
-            const size = abilities.clawOrbit.level >= 4 ? 12 : 8;
-            ctx.fillStyle = '#FF4444';
-            ctx.beginPath();
-            ctx.arc(claw.x, claw.y, size, 0, Math.PI * 2);
-            ctx.fill();
+            const size = abilities.clawOrbit.level >= 4 ? 40 : 32; // Enlarged claw/paw sprites
+            
+            // Draw paw sprite for claws
+            if (sprites.paw && sprites.paw.complete && sprites.paw.naturalWidth > 0) {
+                try {
+                    ctx.drawImage(
+                        sprites.paw,
+                        Math.round(claw.x - size / 2),
+                        Math.round(claw.y - size / 2),
+                        size,
+                        size
+                    );
+                } catch (error) {
+                    console.error('Error drawing paw sprite:', error);
+                    // Fallback to circle if sprite drawing fails
+                    ctx.fillStyle = '#FF4444';
+                    ctx.beginPath();
+                    ctx.arc(claw.x, claw.y, size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                // Fallback to circle if sprite isn't loaded
+                ctx.fillStyle = '#FF4444';
+                ctx.beginPath();
+                ctx.arc(claw.x, claw.y, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             // Afterimages for level 5
             if (abilities.clawOrbit.level >= 5) {
-                ctx.fillStyle = 'rgba(255, 68, 68, 0.3)';
                 const prevX = gameState.player.x + Math.cos(abilities.clawOrbit.rotation + claw.angle - 0.2) * claw.distance;
                 const prevY = gameState.player.y + Math.sin(abilities.clawOrbit.rotation + claw.angle - 0.2) * claw.distance;
-                ctx.beginPath();
-                ctx.arc(prevX, prevY, size, 0, Math.PI * 2);
-                ctx.fill();
+                
+                if (sprites.paw && sprites.paw.complete && sprites.paw.naturalWidth > 0) {
+                    try {
+                        ctx.save();
+                        ctx.globalAlpha = 0.3;
+                        ctx.drawImage(
+                            sprites.paw,
+                            Math.round(prevX - size / 2),
+                            Math.round(prevY - size / 2),
+                            size,
+                            size
+                        );
+                        ctx.restore();
+                    } catch (error) {
+                        // Fallback to circle afterimage
+                        ctx.fillStyle = 'rgba(255, 68, 68, 0.3)';
+                        ctx.beginPath();
+                        ctx.arc(prevX, prevY, size / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.fillStyle = 'rgba(255, 68, 68, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(prevX, prevY, size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         });
     }
 
     // Draw enemies
     enemies.forEach(enemy => {
-        ctx.fillStyle = enemy.color;
-        ctx.beginPath();
-        ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
-        ctx.fill();
+        const spriteSize = 48; // Enlarged enemy sprite size
+        const enemyX = Math.round(enemy.x - spriteSize / 2);
+        const enemyY = Math.round(enemy.y - spriteSize / 2);
+        
+        // Draw enemy sprite
+        if (sprites[enemy.type] && sprites[enemy.type].complete && sprites[enemy.type].naturalWidth > 0) {
+            try {
+                if (enemy.type === 'crow' && enemy.facingLeft) {
+                    // Flip crow horizontally when facing left
+                    ctx.save();
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(
+                        sprites[enemy.type],
+                        -enemyX - spriteSize, // Flip X coordinate
+                        enemyY,
+                        spriteSize,
+                        spriteSize
+                    );
+                    ctx.restore();
+                } else {
+                    // Normal drawing for dog, rat, and right-facing crow
+                    ctx.drawImage(
+                        sprites[enemy.type],
+                        enemyX,
+                        enemyY,
+                        spriteSize,
+                        spriteSize
+                    );
+                }
+            } catch (error) {
+                console.error(`Error drawing ${enemy.type} sprite:`, error);
+                // Fallback to circle if sprite drawing fails
+                ctx.fillStyle = enemy.color;
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // Fallback to circle if sprite isn't loaded
+            ctx.fillStyle = enemy.color;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // HP bar
         if (enemy.hp < enemy.maxHp) {
             ctx.fillStyle = 'red';
-            ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 10, enemy.size * 2, 3);
+            ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 15, enemy.size * 2, 3);
             ctx.fillStyle = 'green';
-            ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 10, (enemy.hp / enemy.maxHp) * enemy.size * 2, 3);
+            ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 15, (enemy.hp / enemy.maxHp) * enemy.size * 2, 3);
         }
     });
 
@@ -739,14 +929,17 @@ function startGame() {
     // Reset game state
     gameState = {
         player: {
-            x: 400,
-            y: 300,
+            x: 600,
+            y: 400,
             hp: 100,
             maxHp: 100,
             level: 1,
             xp: 0,
             xpNext: 10,
-            speed: 3
+            speed: 3,
+            width: 38,  // Player sprite size
+            height: 38, // Player sprite size
+            facingLeft: false // Add facing direction
         },
         time: 0,
         kills: 0,
@@ -795,5 +988,4 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Start the game
-startGame();
+// Game will start automatically after sprite loads
