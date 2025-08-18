@@ -1,7 +1,91 @@
+/**
+ * Catto — a lightweight arena survival game rendered on an HTML5 Canvas.
+ *
+ * This module implements:
+ * - Sprite loading and error handling
+ * - Central immutable-like game state with transient arrays for entities
+ * - Player input, abilities, enemy AI, collisions, and particle effects
+ * - UI updates and a requestAnimationFrame game loop
+ * - High score persistence via localStorage
+ *
+ * The code favors clarity over micro-optimizations and uses the Canvas 2D API.
+ * No external libraries are required.
+ *
+ * JSDoc annotations are provided to aid readers and tooling (e.g., editors/linters).
+ */
+
+/**
+ * @typedef {Object} PlayerState
+ * @property {number} x - Player x-coordinate in world space
+ * @property {number} y - Player y-coordinate in world space
+ * @property {number} hp - Current hit points
+ * @property {number} maxHp - Maximum hit points (capped at 100)
+ * @property {number} level - Current level
+ * @property {number} xp - Current experience points
+ * @property {number} xpNext - XP required for next level
+ * @property {number} speed - Movement speed (pixels per frame)
+ * @property {number} width - Rendered sprite width
+ * @property {number} height - Rendered sprite height
+ * @property {boolean} facingLeft - Whether the sprite is mirrored left
+ * @property {number} [invulnerable] - Remaining invulnerability frames (optional)
+ */
+
+/**
+ * @typedef {Object} Enemy
+ * @property {number} x
+ * @property {number} y
+ * @property {number} hp
+ * @property {number} maxHp
+ * @property {number} speed
+ * @property {number} damage
+ * @property {string} color
+ * @property {number} size - Collision/render radius for fallback circle
+ * @property {number} xpValue - XP dropped on death
+ * @property {('rat'|'dog'|'crow')} type
+ * @property {number} wave - Wave number when spawned
+ * @property {boolean} [facingLeft]
+ */
+
+/**
+ * @typedef {Object} Projectile
+ * @property {number} x
+ * @property {number} y
+ * @property {number} dx - Velocity x-component
+ * @property {number} dy - Velocity y-component
+ * @property {number} damage
+ * @property {number} [range] - Max lifetime measured in frames (used by whip)
+ * @property {boolean} [pierce] - Whether projectile passes through enemies
+ * @property {boolean} [bounce] - Whether projectile can bounce (hairball)
+ * @property {boolean} [explode] - Whether projectile explodes (hairball)
+ * @property {('whip'|'hairball')} type
+ * @property {number} life - Elapsed frames since spawn
+ */
+
+/**
+ * @typedef {Object} XPOrb
+ * @property {number} x
+ * @property {number} y
+ * @property {number} value - XP awarded on collect
+ * @property {number} life - Remaining lifetime in frames
+ */
+
+/**
+ * @typedef {Object} Particle
+ * @property {number} x
+ * @property {number} y
+ * @property {number} radius
+ * @property {number} life - Remaining lifetime in frames
+ * @property {('slam')} type
+ */
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Load all sprites
+/**
+ * Loaded sprite registry. Each `Image` instance is configured with onload/onerror
+ * handlers to track readiness before the game initializes.
+ * @type {{ player: HTMLImageElement, dog: HTMLImageElement, crow: HTMLImageElement, rat: HTMLImageElement, paw: HTMLImageElement }}
+ */
 const sprites = {
     player: new Image(),
     dog: new Image(),
@@ -13,6 +97,11 @@ const sprites = {
 let spritesLoaded = 0;
 const totalSprites = Object.keys(sprites).length;
 
+/**
+ * Handles a single sprite load event; when all sprites are loaded, sets
+ * player sprite dimensions and initializes the game UI/state.
+ * @returns {void}
+ */
 function onSpriteLoad() {
     spritesLoaded++;
     console.log(`Sprite loaded: ${spritesLoaded}/${totalSprites}`);
@@ -30,6 +119,12 @@ function onSpriteLoad() {
     }
 }
 
+/**
+ * Logs a sprite load error and allows the game to start once all attempts
+ * have completed (falling back to primitive shapes if needed).
+ * @param {string} spriteName - Human-readable sprite identifier for logs
+ * @returns {void}
+ */
 function onSpriteError(spriteName) {
     console.error(`Error loading ${spriteName} sprite`);
     spritesLoaded++;
@@ -61,12 +156,18 @@ sprites.paw.onload = onSpriteLoad;
 sprites.paw.onerror = () => onSpriteError('paw');
 sprites.paw.src = 'assets/paw.png';
 
-// Function to get high score from localStorage
+/**
+ * Reads the persisted high score from localStorage.
+ * @returns {number} High score (defaults to 0 if absent or invalid)
+ */
 function getHighScore() {
     return parseInt(localStorage.getItem('catto_highscore') || '0');
 }
 
-// Function to update high score display
+/**
+ * Reflects the saved high score and current score into the UI.
+ * @returns {void}
+ */
 function updateHighScoreDisplay() {
     const highScore = getHighScore();
     document.getElementById('displayHighScore').textContent = highScore;
@@ -75,20 +176,31 @@ function updateHighScoreDisplay() {
     document.getElementById('currentScore').textContent = gameState.kills;
 }
 
-// Function to start game from overlay
+/**
+ * Hides the start overlay and begins a new game session.
+ * @returns {void}
+ */
 function startGameFromOverlay() {
     document.getElementById('startOverlay').style.display = 'none';
     startGame();
 }
 
-// Initialize high score display on page load
+/**
+ * Bootstraps UI state (e.g., high score) and shows the start overlay.
+ * Invoked after all sprites load.
+ * @returns {void}
+ */
 function initializeGame() {
     updateHighScoreDisplay();
     // Show start overlay
     document.getElementById('startOverlay').style.display = 'flex';
 }
 
-// Game state
+/**
+ * Central game state snapshot.
+ * All systems read/write through this structure each frame.
+ * @type {{ player: PlayerState, time: number, kills: number, paused: boolean, gameOver: boolean }}
+ */
 let gameState = {
     player: {
         x: 600,
@@ -109,7 +221,10 @@ let gameState = {
     gameOver: false
 };
 
-// Abilities system
+/**
+ * Ability definitions and runtime cooldown/level state.
+ * Values scale with level according to each ability's rules.
+ */
 const abilities = {
     clawOrbit: {
         name: "Claw Orbit",
@@ -192,13 +307,21 @@ const abilities = {
     }
 };
 
-// Game objects arrays
+/**
+ * Transient collections updated every frame.
+ * @type {Enemy[]}
+ */
 let enemies = [];
+/** @type {Projectile[]} */
 let projectiles = [];
+/** @type {XPOrb[]} */
 let xpOrbs = [];
+/** @type {Particle[]} */
 let particles = [];
 
-// Enemy types with reduced base stats
+/**
+ * Static enemy blueprints before wave/level scaling is applied.
+ */
 const enemyTypes = {
     rat: {
         name: "Street Rat",
@@ -229,12 +352,19 @@ const enemyTypes = {
     }
 };
 
-// Input handling
+/**
+ * Keyboard state map keyed by lowercase key string.
+ * Event listeners update this map on keydown/keyup.
+ */
 const keys = {};
 document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
 document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-// Initialize default claw orbit
+/**
+ * Initializes the default "Claw Orbit" layout based on current level.
+ * Populates the `claws` array with starting angles and distances.
+ * @returns {void}
+ */
 function initClawOrbit() {
     abilities.clawOrbit.claws = [];
     const clawCount = abilities.clawOrbit.level >= 3 ? 4 : 2;
@@ -246,7 +376,10 @@ function initClawOrbit() {
     }
 }
 
-// Update player movement
+/**
+ * Applies player movement from current keyboard state and clamps to bounds.
+ * @returns {void}
+ */
 function updatePlayer() {
     if (keys['w'] || keys['arrowup']) gameState.player.y -= gameState.player.speed;
     if (keys['s'] || keys['arrowdown']) gameState.player.y += gameState.player.speed;
@@ -264,7 +397,11 @@ function updatePlayer() {
     gameState.player.y = Math.max(30, Math.min(canvas.height - 30, gameState.player.y));
 }
 
-// Update abilities
+/**
+ * Ticks ability timers, updates orbit positions, and fires abilities
+ * that are ready based on their cooldowns and levels.
+ * @returns {void}
+ */
 function updateAbilities() {
     // Claw Orbit
     if (abilities.clawOrbit.level > 0) {
@@ -315,6 +452,10 @@ function updateAbilities() {
 }
 
 // Ability functions
+/**
+ * Spawns one or more forward-facing whip projectiles based on level.
+ * @returns {void}
+ */
 function fireWhiskerWhip() {
     const directions = abilities.whiskerWhip.level >= 5 ? [0, Math.PI] : [0];
     directions.forEach(dir => {
@@ -332,6 +473,11 @@ function fireWhiskerWhip() {
     });
 }
 
+/**
+ * Fires one or more hairball projectiles in random directions, applying
+ * per-level bonuses such as additional count, damage, bounce, and explode.
+ * @returns {void}
+ */
 function fireHairball() {
     const count = abilities.hairballBurst.level >= 3 ? 2 : 1;
     for (let i = 0; i < count; i++) {
@@ -353,6 +499,11 @@ function fireHairball() {
     }
 }
 
+/**
+ * Applies an area-of-effect slam around the player and queues a particle
+ * effect; at higher levels, increases radius/damage and performs a second hit.
+ * @returns {void}
+ */
 function pawSlam() {
     let radius = abilities.pawSlam.radius;
     if (abilities.pawSlam.level >= 3) radius *= 1.5;
@@ -381,6 +532,11 @@ function pawSlam() {
     });
 }
 
+/**
+ * Heals the player and optionally grants temporary invulnerability
+ * depending on ability level.
+ * @returns {void}
+ */
 function catNap() {
     let healing = abilities.catNap.healing;
     if (abilities.catNap.level >= 3) healing *= 1.5; // Reduced multiplier since HP is capped
@@ -393,7 +549,11 @@ function catNap() {
     }
 }
 
-// Enemy spawning with progressive difficulty and capping
+/**
+ * Spawns enemies over time with wave- and level-based scaling and caps.
+ * Controls enemy composition and spawn locations around the canvas bounds.
+ * @returns {void}
+ */
 function spawnEnemies() {
     // Enemy count cap based on time and level
     const baseEnemyCap = 15;
@@ -478,7 +638,11 @@ function spawnEnemies() {
     }
 }
 
-// Update enemies
+/**
+ * Updates enemy movement, handles collisions with player and claws,
+ * applies damage/invulnerability rules, and removes defeated enemies.
+ * @returns {void}
+ */
 function updateEnemies() {
     enemies.forEach((enemy, index) => {
         // Move towards player
@@ -552,7 +716,11 @@ function updateEnemies() {
     }
 }
 
-// Update projectiles
+/**
+ * Advances projectiles, checks collisions with enemies, removes spent
+ * projectiles, and respects pierce/range flags.
+ * @returns {void}
+ */
 function updateProjectiles() {
     projectiles.forEach((proj, projIndex) => {
         proj.x += proj.dx;
@@ -580,7 +748,13 @@ function updateProjectiles() {
     });
 }
 
-// XP system with 50% drop chance
+/**
+ * Creates an XP orb at the specified position with a 50% probability.
+ * @param {number} x
+ * @param {number} y
+ * @param {number} value - XP value to award on collection
+ * @returns {void}
+ */
 function dropXP(x, y, value) {
     // 50% chance to drop XP
     if (Math.random() < 0.5) {
@@ -593,6 +767,11 @@ function dropXP(x, y, value) {
     }
 }
 
+/**
+ * Attracts nearby XP orbs, collects them on contact, and triggers level-up
+ * progression when thresholds are reached.
+ * @returns {void}
+ */
 function updateXP() {
     xpOrbs.forEach((orb, index) => {
         // Move towards player if close
@@ -622,7 +801,11 @@ function updateXP() {
     });
 }
 
-// Level up system with scaled XP requirements
+/**
+ * Increments the player's level, adjusts XP thresholds non-linearly,
+ * applies a small heal, and opens the upgrade modal.
+ * @returns {void}
+ */
 function levelUp() {
     gameState.player.level++;
     gameState.player.xp -= gameState.player.xpNext;
@@ -643,6 +826,11 @@ function levelUp() {
     showLevelUpModal();
 }
 
+/**
+ * Populates and displays the level-up modal with up to two random, valid
+ * ability upgrades based on current levels.
+ * @returns {void}
+ */
 function showLevelUpModal() {
     gameState.paused = true;
     const modal = document.getElementById('levelUpModal');
@@ -684,6 +872,12 @@ function showLevelUpModal() {
     modal.style.display = 'block';
 }
 
+/**
+ * Applies the selected ability upgrade, re-initializing dependent state
+ * when necessary, then resumes the game.
+ * @param {keyof typeof abilities} abilityKey
+ * @returns {void}
+ */
 function selectUpgrade(abilityKey) {
     abilities[abilityKey].level++;
     
@@ -696,7 +890,10 @@ function selectUpgrade(abilityKey) {
     gameState.paused = false;
 }
 
-// Update particles
+/**
+ * Ticks particle lifetimes and removes any that have expired.
+ * @returns {void}
+ */
 function updateParticles() {
     particles.forEach((particle, index) => {
         particle.life--;
@@ -706,7 +903,11 @@ function updateParticles() {
     });
 }
 
-// Rendering functions
+/**
+ * Renders the entire frame: background, player, abilities, enemies,
+ * projectiles, XP orbs, and transient particles.
+ * @returns {void}
+ */
 function render() {
     // Clear the canvas with a solid background color
     ctx.fillStyle = '#1a1a2e';
@@ -914,6 +1115,10 @@ function render() {
     });
 }
 
+/**
+ * Updates DOM-based UI elements (HP/XP bars, stats, timers, scores).
+ * @returns {void}
+ */
 function updateUI() {
     // Update HP bar
     const hpPercentage = Math.max(0, gameState.player.hp) / gameState.player.maxHp * 100;
@@ -943,6 +1148,11 @@ function updateUI() {
     document.getElementById('currentScore').textContent = gameState.kills;
 }
 
+/**
+ * Transitions to the game-over state, persists a new high score if achieved,
+ * and updates the summary UI.
+ * @returns {void}
+ */
 function gameOver() {
     gameState.gameOver = true;
     const finalScore = gameState.kills;
@@ -962,6 +1172,11 @@ function gameOver() {
     updateHighScoreDisplay();
 }
 
+/**
+ * Resets all runtime state and arrays, initializes abilities, hides overlays,
+ * and starts the main loop.
+ * @returns {void}
+ */
 function startGame() {
     // Reset game state
     gameState = {
@@ -1007,6 +1222,11 @@ function startGame() {
     gameLoop();
 }
 
+/**
+ * Main game loop executed via requestAnimationFrame. Skips updates when
+ * paused or game over and continuously renders and updates UI.
+ * @returns {void}
+ */
 function gameLoop() {
     if (gameState.gameOver) return;
 
@@ -1027,6 +1247,9 @@ function gameLoop() {
 }
 
 // Initialize game on page load instead of auto-starting
+/**
+ * Entry point after DOM content is ready; initializes UI and shows overlay.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     initializeGame();
 });
