@@ -7,52 +7,56 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <canvas id="gameCanvas" width="1200" height="800"></canvas>
-    
-    <div id="ui">
-        <div class="bar-container">
-            <div class="bar-label">HP</div>
-            <div class="bar">
-                <div class="bar-fill hp-fill" id="hpBar"></div>
-                <div class="bar-text" id="hpText">100/100</div>
-            </div>
-        </div>
+    <div class="main-container">
+        <h1>Catto</h1>
+        <p>Use WASD or Arrow Keys to move the cat</p>
+        <div class="game-container">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
         
-        <div class="bar-container">
-            <div class="bar-label">XP</div>
-            <div class="bar">
-                <div class="bar-fill xp-fill" id="xpBar"></div>
-                <div class="bar-text" id="xpText">0/10</div>
+        <div id="ui">
+            <div class="bar-container">
+                <div class="bar-label">HP</div>
+                <div class="bar">
+                    <div class="bar-fill hp-fill" id="hpBar"></div>
+                    <div class="bar-text" id="hpText">100/100</div>
+                </div>
+            </div>
+            
+            <div class="bar-container">
+                <div class="bar-label">XP</div>
+                <div class="bar">
+                    <div class="bar-fill xp-fill" id="xpBar"></div>
+                    <div class="bar-text" id="xpText">0/10</div>
+                </div>
+            </div>
+            
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span>🐱 Lv.<span id="level">1</span></span>
+                </div>
+                <div class="stat-item">
+                    <span>⏱️ <span id="time">0</span>s</span>
+                </div>
+                <div class="stat-item">
+                    <span>🌊 Wave <span id="wave">1</span></span>
+                </div>
+            </div>
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span>💀 <span id="kills">0</span></span>
+                </div>
+                <div class="stat-item">
+                    <span>👹 <span id="enemyCount">0</span>/<span id="enemyCap">15</span></span>
+                </div>
             </div>
         </div>
-        
-        <div class="stats-row">
-            <div class="stat-item">
-                <span>🐱 Lv.<span id="level">1</span></span>
-            </div>
-            <div class="stat-item">
-                <span>⏱️ <span id="time">0</span>s</span>
-            </div>
-            <div class="stat-item">
-                <span>🌊 Wave <span id="wave">1</span></span>
-            </div>
-        </div>
-        <div class="stats-row">
-            <div class="stat-item">
-                <span>💀 <span id="kills">0</span></span>
-            </div>
-            <div class="stat-item">
-                <span>👹 <span id="enemyCount">0</span>/<span id="enemyCap">15</span></span>
-            </div>
-        </div>
-    </div>
 
-    <div id="levelUpModal">
-        <div class="level-up-content">
-            <h2>⭐ Level Up! Choose an upgrade:</h2>
-            <div id="upgradeChoices" class="choices-row"></div>
+        <div id="levelUpModal">
+            <div class="level-up-content">
+                <h2>⭐ Level Up! Choose an upgrade:</h2>
+                <div id="upgradeChoices" class="choices-row"></div>
+            </div>
         </div>
-    </div>
 
     <div id="gameOver">
         <h2>Game Over!</h2>
@@ -60,6 +64,7 @@
         <p>High Score: <span id="highScore">0</span></p>
         <p>Time Survived: <span id="finalTime">0</span>s</p>
         <button class="restart-btn" onclick="startGame()">Play Again</button>
+    </div>
     </div>
 
     <script src="game.js"></script>

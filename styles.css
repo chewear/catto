@@ -5,30 +5,67 @@
 }
 
 body {
-    background: #2a2a2a;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
     font-family: 'Courier New', monospace;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
     overflow: hidden;
+}
+
+.main-container {
+    border: 2px solid #4a4a4a;
+    border-radius: 15px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-container h1 {
+    font-size: 32px;
+    margin-bottom: 10px;
+    text-shadow: white 0 0 10px;
+}
+
+.main-container p {
+    margin-bottom: 15px;
+    font-size: 0.8em;
+    opacity: 0.7;
+    line-height: 1.4;
+}
+
+.game-container {
+    position: relative;
+    width: fit-content;
+    margin: 0 auto;
+    border-radius: 15px;
 }
 
 #gameCanvas {
     background: linear-gradient(45deg, #1a1a2e, #16213e);
     display: block;
-    margin: 0 auto;
     border: 2px solid #4a4a4a;
+    border-radius: 15px;
 }
 
 #ui {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 20px;
+    left: 20px;
     color: white;
     font-size: 14px;
     z-index: 10;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);
     padding: 15px;
-    border-radius: 8px;
-    border: 2px solid #444;
-    min-width: 200px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    min-width: 220px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .bar-container {
@@ -181,6 +218,7 @@ body {
     position: absolute;
     top: 50%;
     left: 50%;
+    width: 400px;
     transform: translate(-50%, -50%);
     background: rgba(0, 0, 0, 0.9);
     border: 3px solid #ff4444;
@@ -192,8 +230,13 @@ body {
     display: none;
 }
 
+#gameOver h2 {
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
 .restart-btn {
-    margin-top: 20px;
+    margin-top: 16px;
     padding: 10px 20px;
     background: #ff4444;
     border: none;
